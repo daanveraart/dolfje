@@ -1,3 +1,14 @@
+const channelType = {
+  main: "MAIN",
+  vote: "VOTE",
+  sectator: "SECTATOR",
+  standard: "NORMAL",
+  stemstand: "VOTEFLOW",
+  wolves: "WOLVES",
+  talking: "TALKING",
+  spoilers: "SPOILERS",
+};
+
 module.exports = {
   getUserlist,
   getUserName,
@@ -6,7 +17,52 @@ module.exports = {
   postDelayed,
   addSlackName,
   inviteEveryone,
+  createOrGetPrivateChannel,
+  channelType,
 };
+
+async function createOrGetPrivateChannel(client, channelName) {
+  try {
+    const created = await client.conversations.create({
+      token: process.env.SLACK_BOT_TOKEN,
+      name: channelName,
+      is_private: true,
+    });
+    return created;
+  } catch (error) {
+    const slackError = error?.data?.error || error?.error;
+    if (slackError !== "name_taken") {
+      throw error;
+    }
+
+    let cursor;
+    do {
+      const response = await client.conversations.list({
+        token: process.env.SLACK_BOT_TOKEN,
+        types: "private_channel",
+        exclude_archived: false,
+        limit: 1000,
+        cursor,
+      });
+
+      const existing = response.channels.find(
+        (channel) => channel.name === channelName,
+      );
+      if (existing) {
+        return {
+          ok: true,
+          channel: {
+            id: existing.id,
+            name: existing.name,
+          },
+        };
+      }
+      cursor = response.response_metadata?.next_cursor;
+    } while (cursor);
+
+    throw error;
+  }
+}
 
 async function getUserlist(client, channelId) {
   const channelUsersList = [];
@@ -22,7 +78,9 @@ async function getUserlist(client, channelId) {
     if (conversationsMembers.members.includes(user.id) && !user.is_bot) {
       channelUsersList.push({
         id: user.id,
-        name: user.profile.display_name_normalized || user.profile.real_name_normalized,
+        name:
+          user.profile.display_name_normalized ||
+          user.profile.real_name_normalized,
         status: user.profile.status_text,
         votedBy: [],
       });
@@ -37,7 +95,10 @@ async function getUserName(client, userId) {
   });
   for (const user of usersList.members) {
     if (userId === user.id) {
-      return user.profile.display_name_normalized || user.profile.real_name_normalized;
+      return (
+        user.profile.display_name_normalized ||
+        user.profile.real_name_normalized
+      );
     }
   }
 }
@@ -50,7 +111,9 @@ async function addSlackName(client, userArray) {
   for (const member of usersList.members) {
     for (const user of userArray) {
       if (member.id === user.user_id) {
-        user.slack_name = member.profile.display_name_normalized || member.profile.real_name_normalized;
+        user.slack_name =
+          member.profile.display_name_normalized ||
+          member.profile.real_name_normalized;
         resultArray.push(user);
       }
     }
@@ -64,22 +127,38 @@ async function inviteEveryone(client, command, game, queries, t, allChannels) {
   }
   const singleChannel = allChannels.pop();
   try {
-    const spelers = await queries.getEveryOne(game.gms_id);
-    const channelUsersList = await getUserlist(client, singleChannel.gch_slack_id);
-    const uitTeNodigen = spelers.filter((x) => !channelUsersList.map((y) => y.id).includes(x.user_id));
-    if (!uitTeNodigen.length) {
-      await sendIM(client, command.user_id, `${singleChannel.gch_name}: ${t('TEXTALLINVITED')}`);
-    } else {
+    const players = await queries.getEveryOne(game.gms_id);
+    const channelUsersList = await getUserlist(
+      client,
+      singleChannel.gch_slack_id,
+    );
+    const usersToInvite = players.filter(
+      (x) => !channelUsersList.map((y) => y.id).includes(x.user_id),
+    );
+    if (usersToInvite.length) {
       await client.conversations.invite({
         token: process.env.SLACK_BOT_TOKEN,
         channel: singleChannel.gch_slack_id,
-        users: uitTeNodigen.map((x) => x.user_id).join(','),
+        users: usersToInvite.map((x) => x.user_id).join(","),
       });
+    } else {
+      await sendIM(
+        client,
+        command.user_id,
+        `${singleChannel.gch_name}: ${t("TEXTALLINVITED")}`,
+      );
     }
   } catch (err) {
-    await sendIM(client, command.user_id, `invite into ${singleChannel.gch_name} failed: ${err.stack}`);
+    await sendIM(
+      client,
+      command.user_id,
+      `invite into ${singleChannel.gch_name} failed: ${err.stack}`,
+    );
   } finally {
-    setTimeout(() => inviteEveryone(client, command, game, queries, t, allChannels), 15000);
+    setTimeout(
+      () => inviteEveryone(client, command, game, queries, t, allChannels),
+      15000,
+    );
   }
 }
 
@@ -111,19 +190,25 @@ function postDelayed(client, channel, postArray, rePostArray = []) {
   client.chat.postMessage({
     token: process.env.SLACK_BOT_TOKEN,
     channel: channel,
+    text: `Stemmen op *${row.name}*: *${row.votedBy.length + (row.votedByMayor ? 0.5 : 0)}* ${
+      row.votedBy.length ? `(${row.votedBy.join(", ")})` : ""
+    }`,
     blocks: [
       {
-        type: 'section',
+        type: "section",
         text: {
-          type: 'mrkdwn',
+          type: "mrkdwn",
           text: `Stemmen op *${row.name}*: *${row.votedBy.length + (row.votedByMayor ? 0.5 : 0)}* ${
-            row.votedBy.length ? `(${row.votedBy.join(', ')})` : ''
+            row.votedBy.length ? `(${row.votedBy.join(", ")})` : ""
           }`,
         },
       },
     ],
   });
-  setTimeout(() => postDelayed(client, channel, postArray, rePostArray), 2000 + Math.random() * 4000);
+  setTimeout(
+    () => postDelayed(client, channel, postArray, rePostArray),
+    2000 + Math.random() * 4000,
+  );
 }
 
 function postNotVoted(client, channel, postArray) {
@@ -139,12 +224,13 @@ function postNotVoted(client, channel, postArray) {
     client.chat.postMessage({
       token: process.env.SLACK_BOT_TOKEN,
       channel: channel,
+      text: `Spelers die niet hebben gestemd: ${notVoteList.join(", ")}`,
       blocks: [
         {
-          type: 'section',
+          type: "section",
           text: {
-            type: 'mrkdwn',
-            text: `Spelers die niet hebben gestemd: ${notVoteList.join(', ')}`,
+            type: "mrkdwn",
+            text: `Spelers die niet hebben gestemd: ${notVoteList.join(", ")}`,
           },
         },
       ],

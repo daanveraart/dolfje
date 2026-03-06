@@ -1,5 +1,6 @@
 .*
 *.zip
 !/.gitignore
+!/.dockerignore
 !/.prettierrc
 node_modules

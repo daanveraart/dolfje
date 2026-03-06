@@ -6,7 +6,7 @@ Speel een keer mee op https://mnot.nl/weerwolvenslack !
 
 ## Let op!
 
-Voor nieuwe features wordt regelmatig het database schema bijgewerkt, controleer in wwmnot.sql of je alle tabellen en kolommen daarin hebt.
+Dit is versie 3, voor de oude versie met MariaDB kijk naar de branch v2.
 
 ## Installatie handleiding
 
@@ -23,7 +23,7 @@ Op https://api.slack.com/apps kan je een nieuwe app aan maken, het makkelijkst i
 ### Maak de database aan
 
 ```
-De wwmnot.sql maakt de database aan zoals je hem nodig hebt. Dolfje gebruikt een MariaDB database.
+De wwmnot.sql maakt de database aan zoals je hem nodig hebt. Dolfje gebruikt een PostgreSQL database.
 Wil je een ander type database wilt gebruiken zal je zelf de code daar voor moeten aanpassen.
 ```
 
@@ -33,17 +33,35 @@ Wil je een ander type database wilt gebruiken zal je zelf de code daar voor moet
 In voorbeeld.env staat welke regels er in je .env file moeten komen te staan
 ```
 
+Belangrijkste variabelen:
+
+- `SLACK_SIGNING_SECRET`
+- `SLACK_BOT_TOKEN`
+- `DB_HOST`
+- `DB_PORT`
+- `DB_USER`
+- `DB_PASS`
+- `DB_DATABASE`
+- `DB_SCHEMA` (optioneel, standaard `public`)
+- `MNOT_ADMIN_PASS`
+- `APPLANG` (`nl` of `en`)
+- `REG_CHANNEL`
+
+De databaseverbinding wordt in de code opgebouwd uit de `DB_*` variabelen.
+Daarnaast gebruikt Dolfje PostgreSQL `search_path` op basis van `DB_SCHEMA`.
+
 ### Installeer NodeJS
 
 ```
 Installeer NodeJS en installeer de benodige packages.
 ```
 
-### Draai index.js
+De Slack integratie gebruikt `@slack/bolt` in combinatie met `@slack/web-api`.
 
-```
-Draai met NodeJS index.js (ik gebruik hiervoor de pm2 proces manager)
-```
+### Draai container
+
+Draai de container en forward port 6262 vanuit de container door naar een url.
+Controleer in je Slack app dat slash commands/interactivity naar je Dolfje endpoint wijzen.
 
 ## Handleidng
 
@@ -52,7 +70,7 @@ https://metnerdsomtafel.nl/wiki/index.php/Dolfje
 
 ## Credit
 
-Dolfje is gemaakt door foaly, Martin en Vincent met vertaalhulp van Maikel en testhulp van oa Thijs, Gerine, Ferry en deWiskeyNerd (aka deVerteller).
+Dolfje is gemaakt door foaly, Martin en Vincent met vertaalhulp van Maikel en testhulp van oa Thijs, deWhiskyNerd, Ferry, Gerine, Luca, Soof, Jessica, Annabel, Slapstick, Sarah, Coen, Marieke, Lotte, William, Stef, Arnoud, Nini, Rob, Hannah, Dina, Margriet en Xander.
 Je kunt ons vinden op onze weerwolf slack https://mnot.nl/weerwolvenslack
 Heb je vragen, tips, opmeringen, suggesties of wil je iets anders over Dolfje kwijt mag je op die Slack altijd foaly DMen!
 Wil je je dankbaarheid tonen, mag je altijd een kop thee voor me kopen ;) https://paypal.me/foaly
